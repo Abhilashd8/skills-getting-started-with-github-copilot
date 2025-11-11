@@ -194,6 +194,24 @@ footer {
   word-break: break-word;
 }
 
+/* Delete button next to participant */
+.participant-delete {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #c62828;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.participant-delete:hover {
+  background-color: rgba(198,40,40,0.08);
+  color: #b71c1c;
+}
+
 /* Muted fallback text when no participants */
 .muted {
   color: #666;

@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => messageBox.classList.add("hidden"), 4000);
   }
 
-  function createParticipantItem(email) {
+  function createParticipantItem(email, activityName) {
     const li = document.createElement("li");
     li.className = "participant-item";
 
@@ -23,8 +23,46 @@ document.addEventListener("DOMContentLoaded", () => {
     addr.className = "participant-email";
     addr.textContent = email;
 
+    // Delete (unregister) button
+    const del = document.createElement("button");
+    del.className = "participant-delete";
+    del.type = "button";
+    del.title = `Remove ${email}`;
+    del.setAttribute('aria-label', `Remove ${email}`);
+    del.textContent = "✖";
+
+    del.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Unregister ${email} from ${activityName}?`)) return;
+
+      try {
+        const url = `/activities/${encodeURIComponent(activityName)}/participants?email=${encodeURIComponent(email)}`;
+        const res = await fetch(url, { method: "DELETE" });
+        const json = await res.json();
+        if (!res.ok) {
+          showMessage(json.detail || json.message || "Could not remove participant", "error");
+          return;
+        }
+
+        // Update local copy and re-render
+        if (window.__activities && window.__activities[activityName]) {
+          const parts = window.__activities[activityName].participants || [];
+          window.__activities[activityName].participants = parts.filter(p => p !== email);
+          renderActivities(window.__activities);
+        } else {
+          await loadActivities();
+        }
+
+        showMessage(json.message || `Removed ${email}`, "success");
+      } catch (err) {
+        console.error(err);
+        showMessage("Network error while removing participant.", "error");
+      }
+    });
+
     li.appendChild(avatar);
     li.appendChild(addr);
+    li.appendChild(del);
     return li;
   }
 
@@ -62,7 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (Array.isArray(a.participants) && a.participants.length > 0) {
         a.participants.forEach((email) => {
-          participantsList.appendChild(createParticipantItem(email));
+          participantsList.appendChild(createParticipantItem(email, name));
         });
       } else {
         const empty = document.createElement("p");
@@ -129,16 +167,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       showMessage(json.message || "Signed up!", "success");
 
-      // Update local copy and re-render participants list
-      if (!window.__activities) await loadActivities();
-      const activity = window.__activities[activityName];
-      if (activity) {
-        activity.participants = activity.participants || [];
-        activity.participants.push(email);
-        renderActivities(window.__activities);
-      } else {
-        await loadActivities();
-      }
+      // Refresh activities from the server so the UI shows the authoritative
+      // participant list (avoids subtle client-side desyncs). Keep it simple
+      // and fetch the latest state after a successful signup.
+      await loadActivities();
 
       signupForm.reset();
     } catch (err) {
